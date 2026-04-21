@@ -9,35 +9,45 @@ return {
       local dap = require("dap")
       local dap_python = require("dap-python")
 
-      -- Keep the debug session alive after the program exits so you can
-      -- inspect variables, scroll the REPL, etc. Terminate manually with
-      -- <leader>dt or :DapTerminate.
+      -- Keep the debug session alive after the program exits.
       dap.defaults.fallback.terminate_afterwards = false
 
-      -- Resolve the venv python in the current workspace
+      -- Resolve python: prefer the activated venv ($VIRTUAL_ENV), then
+      -- .venv in the project root, then system python3.
       local function venv_python()
-        local cwd = vim.fn.getcwd()
-        local venv = cwd .. "/.venv/bin/python"
-        if vim.fn.filereadable(venv) == 1 then
-          return venv
+        local venv = vim.env.VIRTUAL_ENV
+        if venv and vim.fn.filereadable(venv .. "/bin/python") == 1 then
+          return venv .. "/bin/python"
+        end
+        local root = vim.fs.root(0, { "pyproject.toml", ".git" }) or vim.fn.getcwd()
+        local local_venv = root .. "/.venv/bin/python"
+        if vim.fn.filereadable(local_venv) == 1 then
+          return local_venv
         end
         return "python3"
       end
 
+      -- Resolve workspace root from the current buffer, so relative paths
+      -- in your code work regardless of where nvim was launched from.
+      local function workspace_root()
+        return vim.fs.root(0, { "pyproject.toml", ".git" }) or vim.fn.getcwd()
+      end
+
       dap_python.setup(venv_python())
 
-      -- Custom launch configurations (merged with defaults from nvim-dap-python)
       table.insert(dap.configurations.python, {
         type = "python",
         request = "launch",
         name = "Launch file (workspace, PYTHONPATH)",
         program = "${file}",
-        cwd = "${workspaceFolder}",
+        cwd = workspace_root,
         pythonPath = venv_python,
-        env = { PYTHONPATH = "${workspaceFolder}" },
+        env = {
+          PYTHONPATH = workspace_root,
+          VIRTUAL_ENV = vim.env.VIRTUAL_ENV or "",
+        },
         justMyCode = false,
       })
-
       table.insert(dap.configurations.python, {
         type = "python",
         request = "launch",
@@ -45,9 +55,12 @@ return {
         module = function()
           return vim.fn.input("Module: ")
         end,
-        cwd = "${workspaceFolder}",
+        cwd = workspace_root,
         pythonPath = venv_python,
-        env = { PYTHONPATH = "${workspaceFolder}" },
+        env = {
+          PYTHONPATH = workspace_root,
+          VIRTUAL_ENV = vim.env.VIRTUAL_ENV or "",
+        },
       })
     end,
   },
