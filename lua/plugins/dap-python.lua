@@ -9,6 +9,11 @@ return {
       local dap = require("dap")
       local dap_python = require("dap-python")
 
+      -- Keep the debug session alive after the program exits so you can
+      -- inspect variables, scroll the REPL, etc. Terminate manually with
+      -- <leader>dt or :DapTerminate.
+      dap.defaults.fallback.terminate_afterwards = false
+
       -- Resolve the venv python in the current workspace
       local function venv_python()
         local cwd = vim.fn.getcwd()
