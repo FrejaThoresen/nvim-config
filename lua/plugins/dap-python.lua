@@ -56,7 +56,7 @@ return {
           cwd = workspace_root,
           pythonPath = venv_python,
           env = {
-            PYTHONPATH = workspace_root,
+            PYTHONPATH = workspace_root(),
             VIRTUAL_ENV = vim.env.VIRTUAL_ENV or "",
           },
           justMyCode = false,
