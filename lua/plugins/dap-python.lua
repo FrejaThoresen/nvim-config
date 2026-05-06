@@ -9,46 +9,60 @@ return {
       local dap = require("dap")
       local dap_python = require("dap-python")
 
-      -- Keep the debug session alive after the program exits so you can
-      -- inspect variables, scroll the REPL, etc. Terminate manually with
-      -- <leader>dt or :DapTerminate.
       dap.defaults.fallback.terminate_afterwards = false
 
-      -- Resolve the venv python in the current workspace
       local function venv_python()
-        local cwd = vim.fn.getcwd()
-        local venv = cwd .. "/.venv/bin/python"
-        if vim.fn.filereadable(venv) == 1 then
-          return venv
+        local venv = vim.env.VIRTUAL_ENV
+        if venv and vim.fn.filereadable(venv .. "/bin/python") == 1 then
+          return venv .. "/bin/python"
+        end
+        local root = vim.fs.root(0, { "pyproject.toml", ".git" }) or vim.fn.getcwd()
+        local local_venv = root .. "/.venv/bin/python"
+        if vim.fn.filereadable(local_venv) == 1 then
+          return local_venv
         end
         return "python3"
       end
 
+      local function workspace_root()
+        return vim.fs.root(0, { "pyproject.toml", ".git" }) or vim.fn.getcwd()
+      end
+
       dap_python.setup(venv_python())
 
-      -- Custom launch configurations (merged with defaults from nvim-dap-python)
-      table.insert(dap.configurations.python, {
-        type = "python",
-        request = "launch",
-        name = "Launch file (workspace, PYTHONPATH)",
-        program = "${file}",
-        cwd = "${workspaceFolder}",
-        pythonPath = venv_python,
-        env = { PYTHONPATH = "${workspaceFolder}" },
-        justMyCode = false,
-      })
-
-      table.insert(dap.configurations.python, {
-        type = "python",
-        request = "launch",
-        name = "Launch module",
-        module = function()
-          return vim.fn.input("Module: ")
-        end,
-        cwd = "${workspaceFolder}",
-        pythonPath = venv_python,
-        env = { PYTHONPATH = "${workspaceFolder}" },
-      })
+      -- Replace nvim-dap-python's defaults so only our configs are available
+      dap.configurations.python = {
+        {
+          type = "python",
+          request = "launch",
+          name = "Launch file (workspace, PYTHONPATH)",
+          program = "${file}",
+          cwd = workspace_root,
+          pythonPath = venv_python,
+          env = {
+            PYTHONPATH = workspace_root,
+            VIRTUAL_ENV = vim.env.VIRTUAL_ENV or "",
+          },
+          justMyCode = false,
+          console = "integratedTerminal",
+        },
+        {
+          type = "python",
+          request = "launch",
+          name = "Launch module",
+          module = function()
+            return vim.fn.input("Module: ")
+          end,
+          cwd = workspace_root,
+          pythonPath = venv_python,
+          env = {
+            PYTHONPATH = workspace_root,
+            VIRTUAL_ENV = vim.env.VIRTUAL_ENV or "",
+          },
+          justMyCode = false,
+          console = "integratedTerminal",
+        },
+      }
     end,
   },
 
@@ -58,6 +72,7 @@ return {
       local dap = require("dap")
       dap.listeners.before.event_terminated["dapui_config"] = nil
       dap.listeners.before.event_exited["dapui_config"] = nil
+      dap.listeners.after.event_exited["keep_open"] = function() end
       return opts
     end,
   },
