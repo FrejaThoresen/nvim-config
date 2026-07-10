@@ -36,6 +36,43 @@ return {
       -- ── Auto import/export of .ipynb output chunks ─────────────
       -- (from molten's Notebook-Setup guide)
 
+      -- Install ipykernel into the project .venv and register it as a
+      -- Jupyter kernel named after the project directory. Handles uv-created
+      -- venvs (which have no pip) via `uv pip --python`.
+      local function register_kernel(root, name, on_done)
+        local py = root .. "/.venv/bin/python"
+        local install_cmd
+        if vim.fn.executable(root .. "/.venv/bin/pip") == 1 then
+          install_cmd = { py, "-m", "pip", "install", "ipykernel" }
+        elseif vim.fn.executable("uv") == 1 then
+          install_cmd = { "uv", "pip", "install", "--python", py, "ipykernel" }
+        else
+          vim.notify("Molten: .venv has no pip and 'uv' not found — install ipykernel manually.", vim.log.levels.ERROR)
+          return
+        end
+        vim.notify("Molten: installing ipykernel and registering kernel '" .. name .. "'...", vim.log.levels.INFO)
+        vim.system(install_cmd, {}, function(o1)
+          if o1.code ~= 0 then
+            vim.schedule(function()
+              vim.notify("Molten: ipykernel install failed:\n" .. (o1.stderr or ""), vim.log.levels.ERROR)
+            end)
+            return
+          end
+          vim.system({ py, "-m", "ipykernel", "install", "--user", "--name", name }, {}, function(o2)
+            vim.schedule(function()
+              if o2.code ~= 0 then
+                vim.notify("Molten: kernel registration failed:\n" .. (o2.stderr or ""), vim.log.levels.ERROR)
+                return
+              end
+              vim.notify("Molten: kernel '" .. name .. "' registered.", vim.log.levels.INFO)
+              if on_done then
+                on_done()
+              end
+            end)
+          end)
+        end)
+      end
+
       -- On opening an .ipynb: require a project .venv, then auto-start the
       -- matching kernel and import saved outputs.
       local imb = function(e)
@@ -68,15 +105,18 @@ return {
           end
 
           if not vim.tbl_contains(kernels, kernel_name) then
-            vim.notify(
-              "Molten: no kernel '"
-                .. kernel_name
-                .. "' registered. From the project root:"
-                .. "\n  source .venv/bin/activate && pip install ipykernel"
-                .. '\n  python -m ipykernel install --user --name "$(basename $PWD)"'
-                .. "\nthen reopen the notebook.",
-              vim.log.levels.WARN
+            local choice = vim.fn.confirm(
+              "Molten: no kernel '" .. kernel_name .. "' registered for this project.\n"
+                .. "Install ipykernel into .venv and register it now?",
+              "&Yes\n&No",
+              1
             )
+            if choice == 1 then
+              register_kernel(root, kernel_name, function()
+                vim.cmd(("MoltenInit %s"):format(kernel_name))
+                vim.cmd("MoltenImportOutput")
+              end)
+            end
             return
           end
 
