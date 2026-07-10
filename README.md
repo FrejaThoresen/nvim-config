@@ -25,6 +25,13 @@ sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
 # Verify
 nvim --version
 ```
+If you want molten, do
+
+```bash
+source .venv/bin/activate 
+uv add ipykernel
+python -m ipykernel install --user --name "$(basename $PWD)"
+```
 
 # update fzf (search)
 
