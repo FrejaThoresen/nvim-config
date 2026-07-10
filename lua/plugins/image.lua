@@ -1,7 +1,7 @@
 return {
   {
     "3rd/image.nvim",
-    version = "1.1.0", -- pin version for reliability with molten (see molten Not-So-Quick-Start-Guide)
+    version = "1.5.1", -- pinned for reproducibility; must be >=1.4 for the asciidoc/rst/typst integrations and the magick_cli processor used below (1.1.0 has neither and crashes on setup)
     opts = {
       backend = "kitty", -- or "ueberzug" or "sixel"
       processor = "magick_cli", -- or "magick_rock"
